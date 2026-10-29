@@ -1,11 +1,11 @@
 from datetime import datetime
 from google import genai
+import pandas as pd
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
-# Page Configuration & Branding
-st.set_page_config(
-    page_title="Gift Empowers | AI LinkedIn Coach"
-)
+# Page Configuration & Branding (Page icon removed)
+st.set_page_config(page_title="Gift Empowers | AI LinkedIn Coach")
 st.title("Gift Empowers Project 1000 LinkedIn Reputation Coach")
 st.markdown(
     "Your private AI strategist for building a non-generic digital footprint."
@@ -29,6 +29,69 @@ under Gift Empowers / Project 1000. Guide them using the Quiet Authority framewo
 Never use 'aspiring' or generic AI buzzwords. Ask probing questions first.
 """
 
+# --- CONNECT TO GOOGLE SHEETS DATABASE ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+
+# 1. Verify student email from the 'emails' tab
+def verify_student_email(email_to_check):
+  try:
+    df = conn.read(worksheet="emails", ttl=0)
+    df["email"] = df["email"].str.strip().str.lower()
+    clean_email = email_to_check.strip().lower()
+    return clean_email in df["email"].values
+  except Exception as e:
+    st.error(f"Database connection error (Emails): {e}")
+    return False
+
+
+# 2. Load past chats for this specific user from the 'chats' tab
+def load_user_chats(user_email):
+  try:
+    df = conn.read(worksheet="chats", ttl=0)
+    if df.empty or "email" not in df.columns:
+      return []
+    df["email"] = df["email"].str.strip().str.lower()
+    user_df = df[df["email"] == user_email.strip().lower()]
+
+    history = []
+    for _, row in user_df.iterrows():
+      if pd_notnull_safe(row["role"]) and pd_notnull_safe(row["content"]):
+        history.append({"role": str(row["role"]), "content": str(row["content"])})
+    return history
+  except Exception:
+    return []
+
+
+def pd_notnull_safe(val):
+  return val is not None and str(val) != "nan"
+
+
+# 3. Save a new message to the 'chats' tab
+def save_chat_to_sheet(user_email, role, content):
+  try:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df_existing = conn.read(worksheet="chats", ttl=0)
+    new_row = pd.DataFrame(
+        [
+            {
+                "email": user_email,
+                "timestamp": timestamp,
+                "role": role,
+                "content": content,
+            }
+        ]
+    )
+    updated_df = (
+        pd.concat([df_existing, new_row], ignore_index=True)
+        if not df_existing.empty
+        else new_row
+    )
+    conn.update(worksheet="chats", data=updated_df)
+  except Exception as e:
+    print(f"Error saving chat: {e}")
+
+
 # --- STUDENT EMAIL VERIFICATION GATE ---
 if "user_email" not in st.session_state:
   st.session_state.user_email = None
@@ -36,7 +99,7 @@ if "user_email" not in st.session_state:
 if not st.session_state.user_email:
   st.subheader("🔐 Student Access Verification")
   st.markdown(
- "Please enter the **email address you used to purchase/enroll** to unlock"
+      "Please enter the **email address you used to purchase/enroll** to unlock"
       " your AI Coach."
   )
 
@@ -46,9 +109,18 @@ if not st.session_state.user_email:
 
     if submit_button:
       if entered_email and "@" in entered_email:
-        st.session_state.user_email = entered_email.strip().lower()
-        st.success("Access granted! Loading your coach...")
-        st.rerun()
+        with st.spinner("Verifying your payment records..."):
+          if verify_student_email(entered_email):
+            cleaned_email = entered_email.strip().lower()
+            st.session_state.user_email = cleaned_email
+            st.session_state.messages = load_user_chats(cleaned_email)
+            st.success("Access verified! Loading your coach & past chats...")
+            st.rerun()
+          else:
+            st.error(
+                "❌ **Email not found.** Please ensure you use the exact email"
+                " address you used during purchase."
+            )
       else:
         st.error("Please enter a valid email address.")
   st.stop()
@@ -57,11 +129,12 @@ if not st.session_state.user_email:
 st.sidebar.markdown(f"👤 **Logged in as:** `{st.session_state.user_email}`")
 if st.sidebar.button("Switch Account / Logout"):
   st.session_state.user_email = None
+  st.session_state.messages = []
   st.rerun()
 
-# --- CHAT INTERFACE & BACKEND LOGGING ---
+# --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
-  st.session_state.messages = []
+  st.session_state.messages = load_user_chats(st.session_state.user_email)
 
 # Display past messages
 for message in st.session_state.messages:
@@ -73,15 +146,10 @@ if prompt := st.chat_input(
     "Ask your positioning question or paste a link..."
 ):
   st.session_state.messages.append({"role": "user", "content": prompt})
+  save_chat_to_sheet(st.session_state.user_email, "user", prompt)
+
   with st.chat_message("user"):
     st.markdown(prompt)
-
-  # BACKEND LOGGING: Prints student email & prompt to your Streamlit Cloud Logs
-  timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-  print(
-      f"🔍 [STUDENT USAGE LOG] Time: {timestamp} | User:"
-      f" {st.session_state.user_email} | Prompt: {prompt}"
-  )
 
   # Generate streaming response from Gemini backend
   with st.chat_message("assistant"):
@@ -103,6 +171,7 @@ if prompt := st.chat_input(
       st.session_state.messages.append(
           {"role": "assistant", "content": full_response}
       )
+      save_chat_to_sheet(st.session_state.user_email, "assistant", full_response)
 
     except Exception as e:
       st.error(f"An error occurred: {e}")
