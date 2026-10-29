@@ -36,8 +36,8 @@ if "user_email" not in st.session_state:
 if not st.session_state.user_email:
   st.subheader("🔐 Student Access Verification")
   st.markdown(
-      "Please enter the **email address you used to purchase/enroll** in the"
-      " 60-Day LinkedIn Accelerator to unlock your AI Coach."
+ "Please enter the **email address you used to purchase/enroll** to unlock"
+      " your AI Coach."
   )
 
   with st.form("auth_form"):
