@@ -2,7 +2,7 @@ from datetime import datetime
 from google import genai
 import streamlit as st
 
-# Page Configuration
+# Page Configuration & Branding
 st.set_page_config(
     page_title="Gift Empowers | AI LinkedIn Coach"
 )
@@ -29,7 +29,7 @@ under Gift Empowers / Project 1000. Guide them using the Quiet Authority framewo
 Never use 'aspiring' or generic AI buzzwords. Ask probing questions first.
 """
 
-# --- 1. STUDENT EMAIL VERIFICATION GATE ---
+# --- STUDENT EMAIL VERIFICATION GATE ---
 if "user_email" not in st.session_state:
   st.session_state.user_email = None
 
@@ -59,7 +59,7 @@ if st.sidebar.button("Switch Account / Logout"):
   st.session_state.user_email = None
   st.rerun()
 
-# --- 2. CHAT INTERFACE & BACKEND LOGGING ---
+# --- CHAT INTERFACE & BACKEND LOGGING ---
 if "messages" not in st.session_state:
   st.session_state.messages = []
 
@@ -76,25 +76,33 @@ if prompt := st.chat_input(
   with st.chat_message("user"):
     st.markdown(prompt)
 
-  # BACKEND LOGGING: Automatically prints student email & prompt to your Streamlit Cloud Logs
+  # BACKEND LOGGING: Prints student email & prompt to your Streamlit Cloud Logs
   timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   print(
       f"🔍 [STUDENT USAGE LOG] Time: {timestamp} | User:"
       f" {st.session_state.user_email} | Prompt: {prompt}"
   )
 
-  # Generate response from Gemini backend
+  # Generate streaming response from Gemini backend
   with st.chat_message("assistant"):
-    with st.spinner("Analyzing your positioning..."):
-      try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt,
-            config={"system_instruction": system_prompt},
-        )
-        st.markdown(response.text)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": response.text}
-        )
-      except Exception as e:
-        st.error(f"An error occurred: {e}")
+    message_placeholder = st.empty()
+    full_response = ""
+    try:
+      response_stream = client.models.generate_content_stream(
+          model="gemini-3.8-flash",
+          contents=prompt,
+          config={"system_instruction": system_prompt},
+      )
+
+      for chunk in response_stream:
+        if chunk.text:
+          full_response += chunk.text
+          message_placeholder.markdown(full_response + "▌")
+
+      message_placeholder.markdown(full_response)
+      st.session_state.messages.append(
+          {"role": "assistant", "content": full_response}
+      )
+
+    except Exception as e:
+      st.error(f"An error occurred: {e}")
