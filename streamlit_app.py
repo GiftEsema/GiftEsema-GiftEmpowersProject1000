@@ -4,7 +4,7 @@ import streamlit as st
 
 # Page Configuration
 st.set_page_config(
-    page_title="Gift Empowers | AI LinkedIn Coach", page_icon="🚀"
+    page_title="Gift Empowers | AI LinkedIn Coach"
 )
 st.title("Gift Empowers Project 1000 LinkedIn Reputation Coach")
 st.markdown(
