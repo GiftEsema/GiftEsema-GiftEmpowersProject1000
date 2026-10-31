@@ -4,11 +4,12 @@ import pandas as pd
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# Page Configuration & Branding (Page icon removed)
+# Page Configuration & Branding
 st.set_page_config(page_title="Gift Empowers | AI LinkedIn Coach")
-st.title("Gift Empowers Project 1000 LinkedIn Reputation Coach")
+st.title("Gift Empowers LinkedIn Reputation Coach")
 st.markdown(
-    "Your private AI strategist for building a non-generic digital footprint."
+    "Your private AI strategist for building a non-generic digital footprint"
+    " for emerging professionals."
 )
 
 # Securely load API key
@@ -22,19 +23,27 @@ if "GEMINI_API_KEY" not in st.secrets:
 # Initialize Gemini Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# System Instructions & Framework baked safely into the backend
+# System Instructions & Framework (Strict Quiet Authority + Value Ladder Upsells)
 system_prompt = """
-You are an uncompromising Growth & Positioning Strategist for Nigerian students 
-under Gift Empowers / Project 1000. Guide them using the Quiet Authority framework. 
-Never use 'aspiring' or generic AI buzzwords. Ask probing questions first.
+You are an uncompromising Growth & Positioning Strategist for emerging professionals 
+(students and recent graduates up to 3 years post-graduation) under Gift Empowers. 
+
+CORE RULES:
+1. Guide them strictly using the Quiet Authority framework: prioritize substance, proprietary perspective, 
+   distinct market identity, and long-term reputation over vanity metrics or high-volume posting.
+2. NEVER use the word 'aspiring' or generic AI buzzwords (e.g., 'synergy', 'game-changer', 'rockstar', 'hustle').
+3. Always challenge weak, generic thinking first by asking probing, strategic questions before providing frameworks.
+4. When a user needs deep, bespoke review, profile teardowns, or advanced human-crafted execution beyond what AI can solve, 
+   seamlessly and professionally guide them toward Gift Empowers' higher-level offerings (such as live profile audit sessions, 
+   masterclasses, or upcoming cohort masterclasses) as the natural next step.
 """
 
 # --- CONNECT TO GOOGLE SHEETS DATABASE ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 
-# 1. Verify student email from the 'emails' tab
-def verify_student_email(email_to_check):
+# 1. Verify user email from the 'emails' tab
+def verify_user_email(email_to_check):
   try:
     df = conn.read(worksheet="emails", ttl=0)
     df["email"] = df["email"].str.strip().str.lower()
@@ -92,14 +101,14 @@ def save_chat_to_sheet(user_email, role, content):
     print(f"Error saving chat: {e}")
 
 
-# --- STUDENT EMAIL VERIFICATION GATE ---
+# --- ACCESS VERIFICATION GATE (VIP Vault Framing) ---
 if "user_email" not in st.session_state:
   st.session_state.user_email = None
 
 if not st.session_state.user_email:
-  st.subheader("🔐 Student Access Verification")
+  st.subheader("🔐 Emerging Professional Access Verification")
   st.markdown(
-      "Please enter the **email address you used to purchase/enroll** to unlock"
+      "Please enter the **email address you used to enroll** to access"
       " your AI Coach."
   )
 
@@ -110,11 +119,27 @@ if not st.session_state.user_email:
     if submit_button:
       if entered_email and "@" in entered_email:
         with st.spinner("Verifying your payment records..."):
-          if verify_student_email(entered_email):
+          if verify_user_email(entered_email):
             cleaned_email = entered_email.strip().lower()
             st.session_state.user_email = cleaned_email
-            st.session_state.messages = load_user_chats(cleaned_email)
-            st.success("Access verified! Loading your coach & past chats...")
+
+            # Load past chats or initialize with Quiet Authority welcome
+            past_chats = load_user_chats(cleaned_email)
+            if not past_chats:
+              initial_greeting = (
+                  "Welcome. You are inside the Gift Empowers LinkedIn Reputation"
+                  " Coach. We don't chase vanity metrics or use generic"
+                  " buzzwords here. What is your current career focus, and what"
+                  " specific positioning challenge are we solving today?"
+              )
+              past_chats = [{"role": "assistant", "content": initial_greeting}]
+              save_chat_to_sheet(cleaned_email, "assistant", initial_greeting)
+
+            st.session_state.messages = past_chats
+            st.success(
+                "Access Granted. Initializing your secure session with your"
+                " 24/7 Private Positioning Strategist..."
+            )
             st.rerun()
           else:
             st.error(
@@ -143,7 +168,7 @@ for message in st.session_state.messages:
 
 # User Chat Input Box
 if prompt := st.chat_input(
-    "Ask your positioning question or paste a link..."
+    "Ask your positioning question..."
 ):
   st.session_state.messages.append({"role": "user", "content": prompt})
   save_chat_to_sheet(st.session_state.user_email, "user", prompt)
