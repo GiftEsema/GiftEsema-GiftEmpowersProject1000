@@ -114,7 +114,7 @@ if not st.session_state.user_email:
 
   with st.form("auth_form"):
     entered_email = st.text_input("Your Email Address")
-    submit_button = st.form_submit_button("Unlock AI Coach")
+    submit_button = st.form_submit_button("Access Your AI Coach")
 
     if submit_button:
       if entered_email and "@" in entered_email:
@@ -128,7 +128,7 @@ if not st.session_state.user_email:
             if not past_chats:
               initial_greeting = (
                   "Welcome. You are inside the Gift Empowers LinkedIn Reputation"
-                  " Coach. We don't chase vanity metrics or use generic"
+                  " World. We don't chase vanity metrics or use generic"
                   " buzzwords here. What is your current career focus, and what"
                   " specific positioning challenge are we solving today?"
               )
