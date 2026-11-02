@@ -2,7 +2,6 @@ from datetime import datetime
 from google import genai
 from google.oauth2.service_account import Credentials
 import gspread
-import json
 import pandas as pd
 import streamlit as st
 
@@ -14,13 +13,20 @@ st.markdown(
     " for emerging professionals."
 )
 
-# Securely load API keys
-if "GEMINI_API_KEY" not in st.secrets or "SERVICE_ACCOUNT_JSON" not in st.secrets:
-  st.error(
-      "⚠️ **Secrets Missing!** Please ensure `GEMINI_API_KEY` and"
-      " `SERVICE_ACCOUNT_JSON` are configured in Streamlit Secrets."
-  )
-  st.stop()
+# Securely check required secrets
+required_secrets = [
+    "GEMINI_API_KEY",
+    "private_key",
+    "client_email",
+    "project_id",
+]
+for secret in required_secrets:
+  if secret not in st.secrets:
+    st.error(
+        f"⚠️ **Secret Missing!** Please ensure `{secret}` is configured in"
+        " Streamlit Secrets."
+    )
+    st.stop()
 
 # Initialize Gemini Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
@@ -40,19 +46,42 @@ CORE RULES:
    masterclasses, or upcoming cohort masterclasses) as the natural next step.
 """
 
+
 # --- CONNECT TO GOOGLE SHEETS DIRECTLY VIA GSPREAD ---
 @st.cache_resource
 def init_google_sheet():
-  sa_info = json.loads(st.secrets["SERVICE_ACCOUNT_JSON"])
+  private_key = st.secrets["private_key"]
+  # Clean up escaped newlines if any slipped through
+  private_key = private_key.replace("\\n", "\n")
+
+  creds_dict = {
+      "type": "service_account",
+      "project_id": st.secrets["project_id"],
+      "private_key_id": st.secrets.get("private_key_id", ""),
+      "private_key": private_key,
+      "client_email": st.secrets["client_email"],
+      "client_id": st.secrets.get("client_id", ""),
+      "auth_uri": st.secrets.get(
+          "auth_uri", "https://accounts.google.com/o/oauth2/auth"
+      ),
+      "token_uri": st.secrets.get(
+          "token_uri", "https://oauth2.googleapis.com/token"
+      ),
+      "auth_provider_x509_cert_url": st.secrets.get(
+          "auth_provider_x509_cert_url",
+          "https://www.googleapis.com/oauth2/v1/certs",
+      ),
+      "client_x509_cert_url": st.secrets.get("client_x509_cert_url", ""),
+  }
+
   creds = Credentials.from_service_account_info(
-      sa_info,
+      creds_dict,
       scopes=[
           "https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive",
       ],
   )
   gc = gspread.authorize(creds)
-  # Open your Project 1000 Paid Students Spreadsheet
   spreadsheet = gc.open_by_url(
       "https://docs.google.com/spreadsheets/d/1GPjyyy3xietvP8FaUZ4HSM1pfj8eNeFn1CetH71G4Vw/edit"
   )
